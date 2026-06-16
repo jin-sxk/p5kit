@@ -1,9 +1,9 @@
 {
-  "name": "p5kit",
+  "name": "@jinsxk/p5kit",
   "version": "0.0.0",
   "description": "CLI for turning p5.js sketches into mobile app bundles.",
   "bin": {
-    "p5kit": "./bin/p5kit.js"
+    "p5kit": "bin/p5kit.js"
   },
   "files": [
     "bin",
