@@ -3,3 +3,4 @@ node_modules/
 dist/
 .p5kit/
 .DS_Store
+.claude/settings.local.json
