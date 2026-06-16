@@ -1,5 +1,5 @@
 {
-  "name": "@jinsxk/p5kit",
+  "name": "@p5kit/cli",
   "version": "0.0.0",
   "description": "CLI for turning p5.js sketches into mobile app bundles.",
   "bin": {

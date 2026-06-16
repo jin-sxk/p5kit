@@ -15,7 +15,7 @@
     "p5": "^2.3.0"
   },
   "devDependencies": {
-    "p5kit": "__P5KIT_CLI_SPEC__",
+    "@p5kit/cli": "__P5KIT_CLI_SPEC__",
     "vite": "^8.0.16"
   }
 }

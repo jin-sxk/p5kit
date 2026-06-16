@@ -133,7 +133,7 @@ function createReplacements(targetDir, projectName) {
     __PROJECT_NAME__: projectName,
     __P5KIT_BRIDGE_SPEC__: packageSpec(targetDir, "@p5kit/bridge", "packages/bridge"),
     __P5KIT_CORE_SPEC__: packageSpec(targetDir, "@p5kit/core", "packages/core"),
-    __P5KIT_CLI_SPEC__: packageSpec(targetDir, "p5kit", "packages/cli"),
+    __P5KIT_CLI_SPEC__: packageSpec(targetDir, "@p5kit/cli", "packages/cli"),
   };
 }
 
