@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "bin": {
-    "p5kit": "./bin/p5kit.js"
+    "p5kit": "bin/p5kit.js"
   },
   "scripts": {
     "build": "npm --workspaces --if-present run build",
