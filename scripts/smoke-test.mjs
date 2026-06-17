@@ -19,18 +19,33 @@ function run() {
   exec(process.execPath, [path.join(root, "packages/create-p5kit/bin/create-p5kit.js"), appDir], root);
 
   const generatedPackageJson = readJson(path.join(appDir, "package.json"));
+  assertDependency(generatedPackageJson.dependencies, "@capacitor/android");
+  assertDependency(generatedPackageJson.dependencies, "@capacitor/core");
+  assertDependency(generatedPackageJson.dependencies, "@capacitor/haptics");
+  assertDependency(generatedPackageJson.dependencies, "@capacitor/ios");
+  assertDependency(generatedPackageJson.dependencies, "@capacitor/share");
   assertDependency(generatedPackageJson.dependencies, "@p5kit/core");
   assertDependency(generatedPackageJson.dependencies, "p5");
+  assertDependency(generatedPackageJson.devDependencies, "@capacitor/cli");
   assertDependency(generatedPackageJson.devDependencies, "@p5kit/cli");
   assertDependency(generatedPackageJson.devDependencies, "vite");
   assertMissingDependency(generatedPackageJson.dependencies, "@p5kit/bridge");
 
+  const capacitorConfig = readJson(path.join(appDir, "capacitor.config.json"));
+  assertEqual(capacitorConfig.appId, "dev.p5kit.smoke.app", "capacitor.config.json appId");
+  assertString(capacitorConfig.appName, "capacitor.config.json appName");
+  assertEqual(capacitorConfig.webDir, "dist", "capacitor.config.json webDir");
+
   exec("npm", ["install"], appDir);
   exec("npm", ["run", "build"], appDir);
   exec("npm", ["run", "build:ios"], appDir);
+  exec("npm", ["run", "build:android"], appDir);
 
   assertFile(path.join(appDir, "dist", "index.html"));
-  assertFile(path.join(appDir, ".p5kit", "ios", "Web", "index.html"));
+  assertFile(path.join(appDir, "ios", "App", "App", "public", "index.html"));
+  assertFile(path.join(appDir, "android", "app", "src", "main", "assets", "public", "index.html"));
+  assertMissing(path.join(appDir, ".p5kit", "ios", "Web", "index.html"));
+  assertMissing(path.join(appDir, ".p5kit", "android", "Web", "index.html"));
 
   console.log("Smoke test passed.");
 }
@@ -95,5 +110,17 @@ function assertDependency(dependencies, name) {
 function assertMissingDependency(dependencies, name) {
   if (dependencies && Object.hasOwn(dependencies, name)) {
     throw new Error(`Expected generated package.json not to depend on ${name}`);
+  }
+}
+
+function assertString(value, label) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Expected ${label} to be a non-empty string`);
+  }
+}
+
+function assertEqual(actual, expected, label) {
+  if (actual !== expected) {
+    throw new Error(`Expected ${label} to be ${expected}, found ${actual}`);
   }
 }

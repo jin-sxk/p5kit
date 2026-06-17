@@ -6,14 +6,22 @@
   "scripts": {
     "dev": "p5kit dev",
     "build": "p5kit build web",
+    "run:ios": "p5kit run ios",
+    "run:android": "p5kit run android",
     "build:ios": "p5kit build ios",
     "build:android": "p5kit build android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.4.0",
+    "@capacitor/share": "^8.0.1",
     "@p5kit/core": "__P5KIT_CORE_SPEC__",
     "p5": "^2.3.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.0",
     "@p5kit/cli": "__P5KIT_CLI_SPEC__",
     "vite": "^8.0.16"
   }

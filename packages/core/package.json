@@ -7,6 +7,11 @@
   "exports": {
     ".": "./src/index.js"
   },
+  "dependencies": {
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/share": "^8.0.1"
+  },
   "files": [
     "src"
   ],

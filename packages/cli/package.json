@@ -1,14 +1,13 @@
 {
   "name": "@p5kit/cli",
   "version": "0.1.0",
-  "description": "CLI for turning p5.js sketches into mobile app bundles.",
+  "description": "CLI for turning p5.js sketches into Capacitor-backed mobile apps.",
   "main": "src/cli.js",
   "bin": {
     "p5kit": "bin/p5kit.js"
   },
   "files": [
     "bin",
-    "native",
     "src",
     "README.md"
   ],

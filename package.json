@@ -2,7 +2,7 @@
   "name": "p5kit-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "Toolkit for turning p5.js sketches into iOS apps.",
+  "description": "Toolkit for turning p5.js sketches into Capacitor-backed mobile apps.",
   "workspaces": [
     "packages/*"
   ],

@@ -1,3 +1,7 @@
+import { Capacitor } from "@capacitor/core";
+import { Haptics } from "@capacitor/haptics";
+import { Share } from "@capacitor/share";
+
 const DEFAULT_TIMEOUT_MS = 8000;
 
 let nextRequestId = 1;
@@ -5,6 +9,10 @@ const pendingRequests = new Map();
 
 export async function platform() {
   const fallback = webPlatformInfo();
+
+  if (hasCapacitorRuntime()) {
+    return capacitorPlatformInfo(fallback);
+  }
 
   if (!hasNativeBridge()) {
     return fallback;
@@ -18,7 +26,12 @@ export async function platform() {
 }
 
 export async function vibrate(pattern = 15) {
-  if (hasNativeBridge()) {
+  if (hasCapacitorPlugin("Haptics")) {
+    await Haptics.vibrate({ duration: vibrationDuration(pattern) });
+    return true;
+  }
+
+  if (hasP5KitNativeTarget()) {
     return requestNative("vibrate", { pattern });
   }
 
@@ -30,7 +43,12 @@ export async function vibrate(pattern = 15) {
 }
 
 export async function share(options = {}) {
-  if (hasNativeBridge()) {
+  if (hasCapacitorPlugin("Share")) {
+    const result = await Share.share(options);
+    return { shared: true, target: "capacitor-share", result };
+  }
+
+  if (hasP5KitNativeTarget()) {
     return requestNative("share", options);
   }
 
@@ -57,7 +75,7 @@ export async function saveCanvas(options = {}) {
   const mimeType = options.mimeType || "image/png";
   const dataUrl = canvas.toDataURL(mimeType);
 
-  if (hasNativeBridge()) {
+  if (hasP5KitNativeTarget()) {
     return requestNative("saveCanvas", {
       dataUrl,
       filename,
@@ -94,12 +112,21 @@ export const p5kit = {
 };
 
 export function hasNativeBridge() {
-  return Boolean(getNativeTarget());
+  return isCapacitorNativePlatform() || hasP5KitNativeTarget();
 }
 
 export function nativePlatformName() {
   const target = getNativeTarget();
-  return target ? target.platform : "web";
+
+  if (target) {
+    return target.platform;
+  }
+
+  if (hasCapacitorRuntime()) {
+    return Capacitor.getPlatform();
+  }
+
+  return "web";
 }
 
 export function requestNative(action, payload = {}, options = {}) {
@@ -182,6 +209,49 @@ function webPlatformInfo() {
     language: navigator ? navigator.language : "",
     touch: navigator ? navigator.maxTouchPoints || 0 : 0,
   };
+}
+
+function capacitorPlatformInfo(fallback) {
+  return {
+    ...fallback,
+    kind: Capacitor.getPlatform(),
+    bridge: isCapacitorNativePlatform() ? "capacitor" : fallback.bridge,
+    native: isCapacitorNativePlatform(),
+  };
+}
+
+function hasCapacitorRuntime() {
+  return Boolean(Capacitor && typeof Capacitor.getPlatform === "function");
+}
+
+function isCapacitorNativePlatform() {
+  return (
+    hasCapacitorRuntime() &&
+    typeof Capacitor.isNativePlatform === "function" &&
+    Capacitor.isNativePlatform()
+  );
+}
+
+function hasCapacitorPlugin(name) {
+  return (
+    hasCapacitorRuntime() &&
+    typeof Capacitor.isPluginAvailable === "function" &&
+    Capacitor.isPluginAvailable(name)
+  );
+}
+
+function hasP5KitNativeTarget() {
+  return Boolean(getNativeTarget());
+}
+
+function vibrationDuration(pattern) {
+  if (Array.isArray(pattern)) {
+    const total = pattern.reduce((sum, item) => sum + Number(item || 0), 0);
+    return Math.max(1, total || 300);
+  }
+
+  const duration = Number(pattern);
+  return Number.isFinite(duration) && duration > 0 ? duration : 300;
 }
 
 function resolveCanvas(canvas) {
