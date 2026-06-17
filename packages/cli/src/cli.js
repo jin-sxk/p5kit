@@ -124,12 +124,28 @@ function ensureCapacitorConfig() {
   const configPath = path.resolve(process.cwd(), "capacitor.config.json");
 
   if (fs.existsSync(configPath)) {
+    const config = readJson(configPath, "capacitor.config.json");
+
+    if (config.webDir !== "dist") {
+      throw new Error(
+        `Expected capacitor.config.json webDir to be "dist", found ${JSON.stringify(config.webDir)}. p5kit builds sketches into dist before syncing Capacitor.`
+      );
+    }
+
     return;
   }
 
   throw new Error(
     "Missing capacitor.config.json. Create a new project with npm create p5kit, or add Capacitor config with webDir set to dist."
   );
+}
+
+function readJson(filePath, label) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    throw new Error(`Could not read ${label}: ${error.message}`);
+  }
 }
 
 function runCapacitor(args) {

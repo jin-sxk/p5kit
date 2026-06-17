@@ -43,7 +43,7 @@ export async function vibrate(pattern = 15) {
 }
 
 export async function share(options = {}) {
-  if (hasCapacitorPlugin("Share")) {
+  if (isCapacitorNativePlatform() && hasCapacitorPlugin("Share")) {
     const result = await Share.share(options);
     return { shared: true, target: "capacitor-share", result };
   }
@@ -83,8 +83,56 @@ export async function saveCanvas(options = {}) {
     });
   }
 
+  if (isCapacitorNativePlatform() && hasCapacitorPlugin("Share")) {
+    const result = await Share.share({
+      title: options.title || filename,
+      text: options.text,
+      url: dataUrl,
+      dialogTitle: options.dialogTitle || "Share canvas",
+    });
+
+    return { saved: false, shared: true, target: "capacitor-share", result };
+  }
+
+  if (isCapacitorNativePlatform()) {
+    throw new Error(
+      "Native canvas saving is not available yet. Install @capacitor/share for a share-sheet fallback, or run the sketch in a browser to download the canvas."
+    );
+  }
+
   downloadDataUrl(dataUrl, filename);
   return { saved: true, target: "download" };
+}
+
+export function capabilities() {
+  const navigator = globalThis.navigator;
+  const document = globalThis.document;
+  const hasCanvas =
+    Boolean(document && typeof document.querySelector === "function" && document.querySelector("canvas")) ||
+    Boolean(document && typeof document.createElement === "function");
+  const hasWebShare = Boolean(navigator && typeof navigator.share === "function");
+  const hasClipboard = Boolean(
+    navigator &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function"
+  );
+  const hasVibration = Boolean(navigator && typeof navigator.vibrate === "function");
+  const p5kitNative = hasP5KitNativeTarget();
+  const capacitorNative = isCapacitorNativePlatform();
+
+  return {
+    platform: nativePlatformName(),
+    native: capacitorNative || p5kitNative,
+    capacitor: hasCapacitorRuntime(),
+    capacitorNative,
+    p5kitNativeBridge: p5kitNative,
+    canvas: hasCanvas,
+    haptics: hasCapacitorPlugin("Haptics") || p5kitNative || hasVibration,
+    share: hasCapacitorPlugin("Share") || p5kitNative || hasWebShare || hasClipboard,
+    webShare: hasWebShare,
+    clipboard: hasClipboard,
+    saveCanvas: hasCanvas && (!capacitorNative || hasCapacitorPlugin("Share") || p5kitNative),
+  };
 }
 
 export function installP5KitGlobal(target = globalThis) {
@@ -93,6 +141,7 @@ export function installP5KitGlobal(target = globalThis) {
     vibrate,
     share,
     saveCanvas,
+    capabilities,
     hasNativeBridge,
     nativePlatformName,
   };
@@ -106,6 +155,7 @@ export const p5kit = {
   vibrate,
   share,
   saveCanvas,
+  capabilities,
   installP5KitGlobal,
   hasNativeBridge,
   nativePlatformName,

@@ -8,6 +8,7 @@ new p5((sketch) => {
   let hue = 190;
 
   sketch.setup = () => {
+    sketch.pixelDensity(1);
     sketch.createCanvas(sketch.windowWidth, sketch.windowHeight);
     sketch.colorMode(sketch.HSB, 360, 100, 100, 100);
     sketch.noStroke();
@@ -27,13 +28,9 @@ new p5((sketch) => {
     sketch.circle(sketch.mouseX || sketch.width * 0.5, sketch.mouseY || sketch.height * 0.5, radius * 0.48);
   };
 
-  sketch.touchStarted = () => {
-    p5kit.vibrate(18).catch(() => {});
-    return false;
-  };
-
   sketch.mousePressed = () => {
     p5kit.vibrate(18).catch(() => {});
+    return false;
   };
 
   sketch.windowResized = () => {
