@@ -123,6 +123,8 @@ function resolveTemplateDir(template) {
 
 function createReplacements(targetDir, projectName) {
   return {
+    __APP_NAME__: projectName,
+    __CAPACITOR_APP_ID__: capacitorAppId(projectName),
     __PROJECT_NAME__: projectName,
     __P5KIT_CORE_SPEC__: packageSpec(targetDir, "@p5kit/core", "packages/core"),
     __P5KIT_CLI_SPEC__: packageSpec(targetDir, "@p5kit/cli", "packages/cli"),
@@ -138,7 +140,7 @@ function packageSpec(targetDir, packageName, localPath) {
     return `file:${relative.startsWith(".") ? relative : `./${relative}`}`;
   }
 
-  return readPackageVersion(packageName);
+  return readPackageVersion(packageName) || `^${PACKAGE_JSON.version}`;
 }
 
 function readPackageVersion(packageName) {
@@ -147,7 +149,7 @@ function readPackageVersion(packageName) {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
     return `^${packageJson.version}`;
   } catch {
-    return "^0.0.0";
+    return null;
   }
 }
 
@@ -181,6 +183,16 @@ function sanitizePackageName(name) {
     .replace(/[^a-z0-9._~-]/g, "-")
     .replace(/^-+/, "")
     .replace(/-+$/, "") || "p5kit-sketch";
+}
+
+function capacitorAppId(projectName) {
+  const segments = projectName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .filter(Boolean)
+    .map((segment) => (/^[a-z]/.test(segment) ? segment : `sketch${segment}`));
+
+  return ["dev", "p5kit", ...(segments.length > 0 ? segments : ["sketch"])].join(".");
 }
 
 function printHelp() {

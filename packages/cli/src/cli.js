@@ -42,18 +42,14 @@ async function build(args) {
   }
 
   if (target.name === "ios") {
-    await runVite(["build", ...target.rest]);
-    prepareNativeBundle("ios");
-    console.log("Prepared iOS web bundle in .p5kit/ios/Web.");
-    console.log("The native iOS shell resources are bundled with @p5kit/cli.");
+    await buildAndSyncCapacitor("ios");
+    console.log("Prepared Capacitor iOS project in ios/.");
     return;
   }
 
   if (target.name === "android") {
-    await runVite(["build", ...target.rest]);
-    prepareNativeBundle("android");
-    console.log("Prepared Android web bundle in .p5kit/android/Web.");
-    console.log("Android shell generation is not implemented yet.");
+    await buildAndSyncCapacitor("android");
+    console.log("Prepared Capacitor Android project in android/.");
     return;
   }
 
@@ -69,14 +65,14 @@ async function run(args) {
   }
 
   if (target.name === "ios") {
-    await build(["ios", ...target.rest]);
-    console.log("iOS app launching is not implemented yet.");
+    await buildAndSyncCapacitor("ios");
+    await runCapacitor(["run", "ios", ...target.rest]);
     return;
   }
 
   if (target.name === "android") {
-    await build(["android", ...target.rest]);
-    console.log("Android runtime launching is not implemented yet.");
+    await buildAndSyncCapacitor("android");
+    await runCapacitor(["run", "android", ...target.rest]);
     return;
   }
 
@@ -104,6 +100,58 @@ function runVite(args) {
   return runLocalBin("vite", args, {
     missingMessage:
       "Vite is required for this command. Run npm install in your p5kit project, then try again.",
+  });
+}
+
+async function buildAndSyncCapacitor(platform) {
+  ensureCapacitorConfig();
+  await runVite(["build"]);
+  await ensureCapacitorPlatform(platform);
+  await runCapacitor(["sync", platform]);
+}
+
+async function ensureCapacitorPlatform(platform) {
+  const platformDir = path.resolve(process.cwd(), platform);
+
+  if (fs.existsSync(platformDir)) {
+    return;
+  }
+
+  await runCapacitor(["add", platform]);
+}
+
+function ensureCapacitorConfig() {
+  const configPath = path.resolve(process.cwd(), "capacitor.config.json");
+
+  if (fs.existsSync(configPath)) {
+    const config = readJson(configPath, "capacitor.config.json");
+
+    if (config.webDir !== "dist") {
+      throw new Error(
+        `Expected capacitor.config.json webDir to be "dist", found ${JSON.stringify(config.webDir)}. p5kit builds sketches into dist before syncing Capacitor.`
+      );
+    }
+
+    return;
+  }
+
+  throw new Error(
+    "Missing capacitor.config.json. Create a new project with npm create p5kit, or add Capacitor config with webDir set to dist."
+  );
+}
+
+function readJson(filePath, label) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    throw new Error(`Could not read ${label}: ${error.message}`);
+  }
+}
+
+function runCapacitor(args) {
+  return runLocalBin("cap", args, {
+    missingMessage:
+      "Capacitor CLI is required for this command. Run npm install in your p5kit project, then try again.",
   });
 }
 
@@ -149,64 +197,19 @@ function localBinPath(command) {
   return path.join(process.cwd(), "node_modules", ".bin", `${command}${suffix}`);
 }
 
-function prepareNativeBundle(platform) {
-  const distDir = path.resolve(process.cwd(), "dist");
-
-  if (!fs.existsSync(distDir)) {
-    throw new Error("Expected Vite to create dist before preparing a native bundle.");
-  }
-
-  const outputDir = path.resolve(process.cwd(), ".p5kit", platform, "Web");
-  fs.rmSync(outputDir, { recursive: true, force: true });
-  copyDirectory(distDir, outputDir);
-
-  const readmePath = path.resolve(process.cwd(), ".p5kit", platform, "README.md");
-  fs.writeFileSync(
-    readmePath,
-    [
-      `# p5kit ${platform} bundle`,
-      "",
-      "This directory contains the web assets produced by `p5kit build`.",
-      "Embed the `Web` directory in the native shell and load `index.html` from it.",
-      "",
-    ].join("\n")
-  );
-}
-
-function copyDirectory(source, destination) {
-  fs.mkdirSync(destination, { recursive: true });
-
-  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
-    const sourcePath = path.join(source, entry.name);
-    const destinationPath = path.join(destination, entry.name);
-
-    if (entry.isDirectory()) {
-      copyDirectory(sourcePath, destinationPath);
-      continue;
-    }
-
-    if (entry.isSymbolicLink()) {
-      const link = fs.readlinkSync(sourcePath);
-      fs.symlinkSync(link, destinationPath);
-      continue;
-    }
-
-    fs.copyFileSync(sourcePath, destinationPath);
-  }
-}
-
 function printHelp() {
   console.log(`p5kit ${PACKAGE_JSON.version}
 
 Usage:
   p5kit dev [vite options]
-  p5kit run [web|ios|android] [options]
-  p5kit build [web|ios|android] [options]
+  p5kit run [web|ios|android] [capacitor run options]
+  p5kit build [web|ios|android]
 
 Examples:
   p5kit dev --host 0.0.0.0
   p5kit build web
   p5kit build ios
+  p5kit run android --target Pixel_8
 `);
 }
 

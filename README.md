@@ -2,9 +2,9 @@
 
 [简体中文](README.zh-CN.md)
 
-p5kit is an independent open-source toolkit for turning p5.js sketches into mobile apps.
+p5kit turns p5.js sketches into Capacitor-backed mobile apps with p5-friendly defaults.
 
-It is built for creative coding: keep writing sketches with p5.js, then package the same work for iOS and Android without rewriting the sketch in Swift, Kotlin, or a native UI framework.
+It is not a new WebView runtime and it is not a Capacitor replacement. p5kit is a focused workflow layer for creative coders: keep writing p5.js sketches, then use npm commands to build, sync, and run the same sketch as an iOS or Android app through Capacitor.
 
 ## Quickstart
 
@@ -17,22 +17,43 @@ npm install
 npm run dev
 ```
 
-Edit `src/main.js` and keep the browser preview open while you work.
+Edit `src/main.js` and keep the browser preview open while you work. Starter projects use p5 instance mode so the sketch behaves well in a Vite, npm, and Capacitor app.
 
 ```js
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-}
+import p5 from "p5";
+import { installP5KitGlobal } from "@p5kit/core";
+import "./styles.css";
 
-function draw() {
-  background(20);
-  circle(mouseX, mouseY, 80);
-}
+const p5kit = installP5KitGlobal();
+
+new p5((sketch) => {
+  sketch.setup = () => {
+    sketch.pixelDensity(1);
+    sketch.createCanvas(sketch.windowWidth, sketch.windowHeight);
+    sketch.noStroke();
+  };
+
+  sketch.draw = () => {
+    sketch.background(20);
+    sketch.circle(sketch.mouseX, sketch.mouseY, 80);
+  };
+
+  sketch.mousePressed = () => {
+    p5kit.vibrate(18).catch(() => {});
+    return false;
+  };
+
+  sketch.windowResized = () => {
+    sketch.resizeCanvas(sketch.windowWidth, sketch.windowHeight);
+  };
+}, document.getElementById("app"));
 ```
+
+That example bakes in the mobile defaults p5kit cares about: instance mode, full-window canvas sizing, resize handling, pointer-first input through `mousePressed()`, `return false` to suppress browser gestures, and optional `pixelDensity(1)` for cheaper rendering on high-DPI phones.
 
 ## Mobile Workflow
 
-The long-term p5kit workflow is:
+The p5kit workflow is:
 
 ```sh
 npm create p5kit@latest my-sketch
@@ -45,29 +66,44 @@ p5kit build ios
 p5kit build android
 ```
 
-The current preview already exposes that CLI shape, but native project generation and simulator/device launching are still in progress. In generated projects today, use:
+Generated projects also expose npm scripts:
 
 ```sh
 npm run dev            # start the Vite dev server
 npm run build          # build the web bundle
-npm run build:ios      # prepare .p5kit/ios/Web
-npm run build:android  # prepare .p5kit/android/Web
+npm run build:ios      # build dist, create ios/ if needed, then cap sync ios
+npm run build:android  # build dist, create android/ if needed, then cap sync android
+npm run run:ios        # build, sync, then cap run ios
+npm run run:android    # build, sync, then cap run android
 ```
 
-The native bundle directories contain the web assets that the iOS `WKWebView` shell and future Android `WebView` shell consume.
+The generated `ios/` and `android/` directories are normal Capacitor platform projects. Open them with Xcode or Android Studio when you need native tooling, signing, device logs, or store release settings.
+
+## What p5kit Adds on Top of Capacitor
+
+| Layer | Owner |
+| --- | --- |
+| Native app container | Capacitor |
+| iOS and Android platform projects | Capacitor |
+| Plugin bridge and platform sync | Capacitor |
+| Web bundle | Vite |
+| p5.js sketch template | p5kit |
+| p5-friendly CLI commands | p5kit |
+| Mobile creative-coding defaults | p5kit |
+| Canvas save/share, haptics, motion, gestures, Pencil, and capability APIs | p5kit over Capacitor plugins |
 
 ## How It Works
 
 ```text
 p5.js sketch
   -> Vite web bundle
-  -> p5kit native bundle
-  -> iOS WKWebView / Android WebView
-  -> JavaScript-to-native bridge
-  -> mobile capabilities
+  -> Capacitor web assets
+  -> Capacitor iOS / Android projects
+  -> Capacitor plugins
+  -> p5kit creative-coding API
 ```
 
-p5.js still renders through the browser canvas runtime. p5kit focuses on the mobile app work around that sketch: project scaffolding, bundling, native shells, bridge APIs, resource paths, canvas sizing, touch behavior, safe areas, permissions, audio, and mobile-friendly defaults.
+p5.js still renders through the browser canvas runtime. Capacitor provides the native app container, platform projects, sync workflow, lifecycle, and plugin bridge. p5kit focuses on the p5.js-specific work around that runtime: project scaffolding, p5-friendly commands, resource paths, canvas sizing, touch behavior, safe areas, permissions, audio unlock, saving and sharing canvas output, and mobile-friendly creative-coding defaults.
 
 ## Current Status
 
@@ -76,37 +112,40 @@ p5kit is an early preview.
 Today it can:
 
 - scaffold a minimal p5.js project with `npm create p5kit`
+- include Capacitor configuration and iOS/Android dependencies in generated projects
 - run a local Vite dev server through `p5kit dev`
 - build a production web bundle through `p5kit build web`
-- prepare iOS and Android web asset directories
-- provide a Swift Package with the current iOS `WKWebView` shell component
-- expose a small JavaScript bridge foundation
+- create and sync Capacitor iOS and Android platform projects through `p5kit build ios` and `p5kit build android`
+- hand off simulator/device launching to `cap run` through `p5kit run ios` and `p5kit run android`
+- wrap Capacitor Haptics and Share behind the small `@p5kit/core` API
 
 It does not yet:
 
-- generate a complete Xcode project
-- generate a complete Android project
-- launch iOS or Android simulators/devices from `p5kit run`
+- provide custom p5kit native plugins for Pencil, gesture, motion, camera, microphone, or file/media workflows
+- hide all Xcode, Android Studio, SDK, signing, or simulator requirements
 - handle signing, store metadata, or store-ready release builds
-- replace general-purpose tools like Capacitor or Cordova
+- prove that p5.js users need a larger platform beyond a few focused mobile examples
+- replace Capacitor or Cordova
+
+## Why p5kit If Capacitor Exists
+
+Capacitor answers: "How do I ship a web app as a native app?"
+
+p5kit answers: "How do I make a p5.js sketch behave well as a mobile creative app?"
+
+That narrower question changes the defaults. p5kit should make full-screen canvas layout, pointer/touch behavior, safe areas, sensor permissions, audio unlock, asset paths, saving and sharing canvas output, and creative input APIs feel natural for p5.js users who do not want to become mobile platform engineers first.
 
 ## What's Inside
 
 - `create-p5kit`: the scaffolder used by `npm create p5kit`
-- `@p5kit/cli`: the package that provides the `p5kit` command
-- `@p5kit/core`: browser runtime helpers, lifecycle conventions, platform detection, and JavaScript-to-native bridge internals
+- `@p5kit/cli`: the package that provides the `p5kit` command and drives Vite plus Capacitor
+- `@p5kit/core`: runtime helpers, lifecycle conventions, platform detection, and p5-friendly wrappers over Capacitor plugins
 
-Starter templates and native shell resources are owned by the scaffolder and CLI. They are not separate packages users need to install.
-
-## Why p5kit
-
-Capacitor and Cordova already package web apps for mobile. p5kit is narrower: it is for p5.js sketches and creative coding workflows.
-
-The goal is not just to put a web page in a WebView. The goal is to make sketches feel natural on phones and tablets by handling the recurring details p5.js artists hit on mobile: full-screen canvas layout, touch input, safe areas, sensors, audio unlock behavior, asset packaging, bridge calls, and native build handoff.
+Starter templates are owned by the scaffolder. Native platform projects are generated by Capacitor inside the user's sketch project.
 
 ## Development
 
-For repository setup, smoke tests, package layout, architecture notes, and roadmap details, see [Development notes](docs/development.md).
+For repository setup, smoke tests, package layout, architecture notes, implementation guidance, and roadmap details, see [Development notes](docs/development.md).
 
 ## Relationship to p5.js
 

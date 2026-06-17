@@ -1,3 +1,7 @@
+import { Capacitor } from "@capacitor/core";
+import { Haptics } from "@capacitor/haptics";
+import { Share } from "@capacitor/share";
+
 const DEFAULT_TIMEOUT_MS = 8000;
 
 let nextRequestId = 1;
@@ -5,6 +9,10 @@ const pendingRequests = new Map();
 
 export async function platform() {
   const fallback = webPlatformInfo();
+
+  if (hasCapacitorRuntime()) {
+    return capacitorPlatformInfo(fallback);
+  }
 
   if (!hasNativeBridge()) {
     return fallback;
@@ -18,7 +26,12 @@ export async function platform() {
 }
 
 export async function vibrate(pattern = 15) {
-  if (hasNativeBridge()) {
+  if (hasCapacitorPlugin("Haptics")) {
+    await Haptics.vibrate({ duration: vibrationDuration(pattern) });
+    return true;
+  }
+
+  if (hasP5KitNativeTarget()) {
     return requestNative("vibrate", { pattern });
   }
 
@@ -30,7 +43,12 @@ export async function vibrate(pattern = 15) {
 }
 
 export async function share(options = {}) {
-  if (hasNativeBridge()) {
+  if (isCapacitorNativePlatform() && hasCapacitorPlugin("Share")) {
+    const result = await Share.share(options);
+    return { shared: true, target: "capacitor-share", result };
+  }
+
+  if (hasP5KitNativeTarget()) {
     return requestNative("share", options);
   }
 
@@ -57,7 +75,7 @@ export async function saveCanvas(options = {}) {
   const mimeType = options.mimeType || "image/png";
   const dataUrl = canvas.toDataURL(mimeType);
 
-  if (hasNativeBridge()) {
+  if (hasP5KitNativeTarget()) {
     return requestNative("saveCanvas", {
       dataUrl,
       filename,
@@ -65,8 +83,56 @@ export async function saveCanvas(options = {}) {
     });
   }
 
+  if (isCapacitorNativePlatform() && hasCapacitorPlugin("Share")) {
+    const result = await Share.share({
+      title: options.title || filename,
+      text: options.text,
+      url: dataUrl,
+      dialogTitle: options.dialogTitle || "Share canvas",
+    });
+
+    return { saved: false, shared: true, target: "capacitor-share", result };
+  }
+
+  if (isCapacitorNativePlatform()) {
+    throw new Error(
+      "Native canvas saving is not available yet. Install @capacitor/share for a share-sheet fallback, or run the sketch in a browser to download the canvas."
+    );
+  }
+
   downloadDataUrl(dataUrl, filename);
   return { saved: true, target: "download" };
+}
+
+export function capabilities() {
+  const navigator = globalThis.navigator;
+  const document = globalThis.document;
+  const hasCanvas =
+    Boolean(document && typeof document.querySelector === "function" && document.querySelector("canvas")) ||
+    Boolean(document && typeof document.createElement === "function");
+  const hasWebShare = Boolean(navigator && typeof navigator.share === "function");
+  const hasClipboard = Boolean(
+    navigator &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function"
+  );
+  const hasVibration = Boolean(navigator && typeof navigator.vibrate === "function");
+  const p5kitNative = hasP5KitNativeTarget();
+  const capacitorNative = isCapacitorNativePlatform();
+
+  return {
+    platform: nativePlatformName(),
+    native: capacitorNative || p5kitNative,
+    capacitor: hasCapacitorRuntime(),
+    capacitorNative,
+    p5kitNativeBridge: p5kitNative,
+    canvas: hasCanvas,
+    haptics: hasCapacitorPlugin("Haptics") || p5kitNative || hasVibration,
+    share: hasCapacitorPlugin("Share") || p5kitNative || hasWebShare || hasClipboard,
+    webShare: hasWebShare,
+    clipboard: hasClipboard,
+    saveCanvas: hasCanvas && (!capacitorNative || hasCapacitorPlugin("Share") || p5kitNative),
+  };
 }
 
 export function installP5KitGlobal(target = globalThis) {
@@ -75,6 +141,7 @@ export function installP5KitGlobal(target = globalThis) {
     vibrate,
     share,
     saveCanvas,
+    capabilities,
     hasNativeBridge,
     nativePlatformName,
   };
@@ -88,18 +155,28 @@ export const p5kit = {
   vibrate,
   share,
   saveCanvas,
+  capabilities,
   installP5KitGlobal,
   hasNativeBridge,
   nativePlatformName,
 };
 
 export function hasNativeBridge() {
-  return Boolean(getNativeTarget());
+  return isCapacitorNativePlatform() || hasP5KitNativeTarget();
 }
 
 export function nativePlatformName() {
   const target = getNativeTarget();
-  return target ? target.platform : "web";
+
+  if (target) {
+    return target.platform;
+  }
+
+  if (hasCapacitorRuntime()) {
+    return Capacitor.getPlatform();
+  }
+
+  return "web";
 }
 
 export function requestNative(action, payload = {}, options = {}) {
@@ -182,6 +259,49 @@ function webPlatformInfo() {
     language: navigator ? navigator.language : "",
     touch: navigator ? navigator.maxTouchPoints || 0 : 0,
   };
+}
+
+function capacitorPlatformInfo(fallback) {
+  return {
+    ...fallback,
+    kind: Capacitor.getPlatform(),
+    bridge: isCapacitorNativePlatform() ? "capacitor" : fallback.bridge,
+    native: isCapacitorNativePlatform(),
+  };
+}
+
+function hasCapacitorRuntime() {
+  return Boolean(Capacitor && typeof Capacitor.getPlatform === "function");
+}
+
+function isCapacitorNativePlatform() {
+  return (
+    hasCapacitorRuntime() &&
+    typeof Capacitor.isNativePlatform === "function" &&
+    Capacitor.isNativePlatform()
+  );
+}
+
+function hasCapacitorPlugin(name) {
+  return (
+    hasCapacitorRuntime() &&
+    typeof Capacitor.isPluginAvailable === "function" &&
+    Capacitor.isPluginAvailable(name)
+  );
+}
+
+function hasP5KitNativeTarget() {
+  return Boolean(getNativeTarget());
+}
+
+function vibrationDuration(pattern) {
+  if (Array.isArray(pattern)) {
+    const total = pattern.reduce((sum, item) => sum + Number(item || 0), 0);
+    return Math.max(1, total || 300);
+  }
+
+  const duration = Number(pattern);
+  return Number.isFinite(duration) && duration > 0 ? duration : 300;
 }
 
 function resolveCanvas(canvas) {
