@@ -59,6 +59,8 @@ The p5kit workflow is:
 npm create p5kit@latest my-sketch
 cd my-sketch
 
+p5kit doctor android
+
 p5kit run ios
 p5kit run android
 
@@ -75,9 +77,12 @@ npm run build:ios      # build dist, create ios/ if needed, then cap sync ios
 npm run build:android  # build dist, create android/ if needed, then cap sync android
 npm run run:ios        # build, sync, then cap run ios
 npm run run:android    # build, sync, then cap run android
+npm run doctor:android # check Java and Android SDK setup
 ```
 
 The generated `ios/` and `android/` directories are normal Capacitor platform projects. Open them with Xcode or Android Studio when you need native tooling, signing, device logs, or store release settings.
+
+Android commands now check for a Java runtime and Android SDK before entering Capacitor's Android flow. If the local machine is not ready, `p5kit build android`, `p5kit run android`, and `p5kit doctor android` fail with a p5kit diagnosis instead of continuing into a Gradle sync warning.
 
 ## What p5kit Adds on Top of Capacitor
 
@@ -117,6 +122,7 @@ Today it can:
 - build a production web bundle through `p5kit build web`
 - create and sync Capacitor iOS and Android platform projects through `p5kit build ios` and `p5kit build android`
 - hand off simulator/device launching to `cap run` through `p5kit run ios` and `p5kit run android`
+- diagnose missing Android Java / SDK setup through `p5kit doctor android`
 - wrap Capacitor Haptics and Share behind the small `@p5kit/core` API
 
 It does not yet:

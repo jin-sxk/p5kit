@@ -30,23 +30,28 @@ function run() {
   assertDependency(generatedPackageJson.devDependencies, "@p5kit/cli");
   assertDependency(generatedPackageJson.devDependencies, "vite");
   assertMissingDependency(generatedPackageJson.dependencies, "@p5kit/bridge");
+  assertScript(generatedPackageJson.scripts, "doctor:android", "p5kit doctor android");
 
   const capacitorConfig = readJson(path.join(appDir, "capacitor.config.json"));
   assertEqual(capacitorConfig.appId, "dev.p5kit.smoke.app", "capacitor.config.json appId");
   assertString(capacitorConfig.appName, "capacitor.config.json appName");
   assertEqual(capacitorConfig.webDir, "dist", "capacitor.config.json webDir");
   assertTemplateMobileDefaults(appDir);
+  assertAndroidDoctorFailsClearly(appDir);
+  assertAndroidBuildFailsClearlyWithoutToolchain(appDir);
 
   exec("npm", ["install"], appDir);
   assertInvalidCapacitorWebDirFailsClearly(appDir);
   exec(process.execPath, [path.join(root, "scripts", "smoke-test-core.mjs")], appDir);
   exec("npm", ["run", "build"], appDir);
   exec("npm", ["run", "build:ios"], appDir);
-  exec("npm", ["run", "build:android"], appDir);
+  const androidProjectBuilt = buildAndroidIfToolchainIsAvailable(appDir);
 
   assertFile(path.join(appDir, "dist", "index.html"));
   assertFile(path.join(appDir, "ios", "App", "App", "public", "index.html"));
-  assertFile(path.join(appDir, "android", "app", "src", "main", "assets", "public", "index.html"));
+  if (androidProjectBuilt) {
+    assertFile(path.join(appDir, "android", "app", "src", "main", "assets", "public", "index.html"));
+  }
   assertMissing(path.join(appDir, ".p5kit", "ios", "Web", "index.html"));
   assertMissing(path.join(appDir, ".p5kit", "android", "Web", "index.html"));
 
@@ -69,10 +74,11 @@ function exec(command, args, cwd) {
   }
 }
 
-function execExpectFailure(command, args, cwd) {
+function execExpectFailure(command, args, cwd, options = {}) {
   const result = childProcess.spawnSync(command, args, {
     cwd,
     encoding: "utf8",
+    env: options.env || process.env,
     shell: process.platform === "win32",
   });
 
@@ -134,6 +140,12 @@ function assertMissingDependency(dependencies, name) {
   }
 }
 
+function assertScript(scripts, name, command) {
+  if (!scripts || scripts[name] !== command) {
+    throw new Error(`Expected generated package.json script ${name} to be ${command}`);
+  }
+}
+
 function assertString(value, label) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Expected ${label} to be a non-empty string`);
@@ -172,6 +184,84 @@ function assertInvalidCapacitorWebDirFailsClearly(projectDir) {
     'Expected capacitor.config.json webDir to be "dist"',
     "invalid Capacitor webDir should fail with p5kit guidance"
   );
+}
+
+function buildAndroidIfToolchainIsAvailable(projectDir) {
+  if (androidToolchainAvailable(projectDir)) {
+    exec("npm", ["run", "build:android"], projectDir);
+    return true;
+  }
+
+  const output = execExpectFailure("npm", ["run", "build:android"], projectDir);
+
+  assertIncludes(output, "Android toolchain check failed", "build:android should fail clearly without toolchain");
+  assertIncludes(output, "Java runtime: missing", "build:android should report missing Java");
+  assertIncludes(output, "p5kit doctor android", "build:android should point users to doctor android");
+
+  return false;
+}
+
+function androidToolchainAvailable(projectDir) {
+  const result = childProcess.spawnSync(
+    process.execPath,
+    [path.join(root, "packages/cli/bin/p5kit.js"), "doctor", "android"],
+    {
+      cwd: projectDir,
+      encoding: "utf8",
+      shell: process.platform === "win32",
+    }
+  );
+
+  return result.status === 0;
+}
+
+function assertAndroidDoctorFailsClearly(projectDir) {
+  const output = execExpectFailure(
+    process.execPath,
+    [path.join(root, "packages/cli/bin/p5kit.js"), "doctor", "android"],
+    projectDir,
+    {
+      env: missingAndroidToolchainEnv(),
+    }
+  );
+
+  assertIncludes(output, "Android toolchain check failed", "doctor android should fail with a clear summary");
+  assertIncludes(output, "Java runtime: missing", "doctor android should report missing Java");
+  assertIncludes(output, "Android SDK: missing", "doctor android should report missing Android SDK");
+  assertIncludes(output, "p5kit doctor android", "doctor android should tell users how to re-check");
+}
+
+function assertAndroidBuildFailsClearlyWithoutToolchain(projectDir) {
+  const output = execExpectFailure(
+    process.execPath,
+    [path.join(root, "packages/cli/bin/p5kit.js"), "build", "android"],
+    projectDir,
+    {
+      env: missingAndroidToolchainEnv(),
+    }
+  );
+
+  assertIncludes(output, "Android toolchain check failed", "build android should fail before Capacitor warnings");
+  assertIncludes(output, "Java runtime: missing", "build android should report missing Java");
+  assertExcludes(output, "Unable to locate a Java Runtime", "build android should not leak Gradle sync warnings first");
+}
+
+function missingAndroidToolchainEnv() {
+  const emptyBinDir = path.join(tmpRoot, "empty-bin");
+  const emptyHomeDir = path.join(tmpRoot, "empty-home");
+
+  fs.mkdirSync(emptyBinDir, { recursive: true });
+  fs.mkdirSync(emptyHomeDir, { recursive: true });
+
+  return {
+    ...process.env,
+    ANDROID_HOME: "",
+    ANDROID_SDK_ROOT: "",
+    HOME: emptyHomeDir,
+    LOCALAPPDATA: "",
+    PATH: emptyBinDir,
+    USERPROFILE: emptyHomeDir,
+  };
 }
 
 function assertIncludes(content, expected, label) {

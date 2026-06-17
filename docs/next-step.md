@@ -4,7 +4,9 @@
 
 Build an examples-driven validation layer before adding custom native plugins.
 
-The current implementation can scaffold a Capacitor-backed p5.js project, build and sync iOS/Android platforms, and expose a small `@p5kit/core` API. The next gap is proving why p5kit is useful to p5.js users. That proof should come from runnable examples, not more platform abstraction.
+The current implementation can scaffold a Capacitor-backed p5.js project, build and sync iOS/Android platforms, diagnose Android Java / SDK readiness with `p5kit doctor android`, and expose a small `@p5kit/core` API. The next gap is proving why p5kit is useful to p5.js users. That proof should come from runnable examples, not more platform abstraction.
+
+Android toolchain readiness is now a CLI guardrail rather than an example goal. Keep it covered while building examples: if Java or the Android SDK is missing, Android build/run commands should fail before Capacitor Gradle sync output.
 
 ## Scope
 
@@ -27,7 +29,8 @@ Keep each example small, readable, and close to the starter template style.
    - `p5kit.saveCanvas()`
    - `p5kit.share()`
    - `p5kit.capabilities()`
-6. Add a short `Examples` section to `README.md` and `README.zh-CN.md`.
+6. Keep `p5kit doctor android` coverage intact when adding Android example checks.
+7. Add a short `Examples` section to `README.md` and `README.zh-CN.md`.
 
 ## Non-Goals
 

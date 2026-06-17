@@ -59,6 +59,8 @@ p5kit 的目标工作流是：
 npm create p5kit@latest my-sketch
 cd my-sketch
 
+p5kit doctor android
+
 p5kit run ios
 p5kit run android
 
@@ -75,9 +77,12 @@ npm run build:ios      # 构建 dist，必要时创建 ios/，然后 cap sync io
 npm run build:android  # 构建 dist，必要时创建 android/，然后 cap sync android
 npm run run:ios        # 构建、同步，然后 cap run ios
 npm run run:android    # 构建、同步，然后 cap run android
+npm run doctor:android # 检查 Java 和 Android SDK 设置
 ```
 
 生成的 `ios/` 和 `android/` 目录是标准 Capacitor 平台工程。需要原生工具链、签名、设备日志或商店发布设置时，可以用 Xcode 或 Android Studio 打开它们。
+
+Android 命令现在会在进入 Capacitor 的 Android 流程前检查 Java runtime 和 Android SDK。如果本机环境还没准备好，`p5kit build android`、`p5kit run android` 和 `p5kit doctor android` 会先给出 p5kit 自己的诊断，而不是继续冒出 Gradle sync warning。
 
 ## p5kit 在 Capacitor 之上提供什么
 
@@ -117,6 +122,7 @@ p5kit 目前是早期预览版。
 - 通过 `p5kit build web` 构建生产用 web bundle
 - 通过 `p5kit build ios` 和 `p5kit build android` 创建并同步 Capacitor iOS / Android 平台工程
 - 通过 `p5kit run ios` 和 `p5kit run android` 把模拟器/真机启动交给 `cap run`
+- 通过 `p5kit doctor android` 诊断 Android Java / SDK 缺失
 - 在 `@p5kit/core` 中用小型 API 包装 Capacitor Haptics 和 Share
 
 它还不能：

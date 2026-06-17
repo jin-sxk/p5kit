@@ -35,6 +35,7 @@ npm test
 ```
 
 The smoke test creates a temporary p5kit app, installs its dependencies, builds the web bundle, and verifies the generated Capacitor project surface.
+When the local Android toolchain is missing, the smoke test expects `p5kit build android` to fail early with p5kit's Java / SDK diagnosis instead of leaking a Gradle sync warning.
 
 Create a local project from the current checkout:
 
@@ -45,6 +46,7 @@ npm install
 npm run dev
 npm run build
 npm run build:ios
+npm run doctor:android
 ```
 
 ## Package Layout
@@ -154,6 +156,7 @@ Code deliverables:
 - include Capacitor iOS and Android dependencies in generated projects
 - implement `p5kit build ios` and `p5kit build android` as build + ensure platform + sync commands
 - implement `p5kit run ios` and `p5kit run android` as build + sync + `cap run` handoffs
+- implement `p5kit doctor android` and gate Android build/run commands on Java plus Android SDK availability
 - keep smoke tests focused on generated project shape, dependencies, web build output, and Capacitor handoff points
 
 Validation:
@@ -161,6 +164,7 @@ Validation:
 - `npm create p5kit` creates a project without manual native setup
 - `npm run build`, `npm run build:ios`, and `npm run build:android` are understandable and repeatable
 - generated platform projects remain standard Capacitor projects
+- missing Android Java / SDK setup fails before Capacitor Gradle sync output
 
 ### Phase 1: p5 Mobile Template Defaults
 

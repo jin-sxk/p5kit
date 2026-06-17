@@ -1,5 +1,6 @@
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -25,6 +26,9 @@ async function main(argv) {
     case "build":
       await build(rest);
       return;
+    case "doctor":
+      await doctor(rest);
+      return;
     case "run":
       await run(rest);
       return;
@@ -48,6 +52,7 @@ async function build(args) {
   }
 
   if (target.name === "android") {
+    ensureAndroidToolchain();
     await buildAndSyncCapacitor("android");
     console.log("Prepared Capacitor Android project in android/.");
     return;
@@ -71,12 +76,25 @@ async function run(args) {
   }
 
   if (target.name === "android") {
+    ensureAndroidToolchain();
     await buildAndSyncCapacitor("android");
     await runCapacitor(["run", "android", ...target.rest]);
     return;
   }
 
   throw new Error(`Unsupported run target: ${target.name}`);
+}
+
+async function doctor(args) {
+  const target = readTarget(args, "android");
+
+  if (target.name === "android") {
+    ensureAndroidToolchain();
+    console.log("Android toolchain check passed.");
+    return;
+  }
+
+  throw new Error(`Unsupported doctor target: ${target.name}`);
 }
 
 function readTarget(args, fallback) {
@@ -148,6 +166,162 @@ function readJson(filePath, label) {
   }
 }
 
+function ensureAndroidToolchain() {
+  const status = androidToolchainStatus(process.cwd(), process.env);
+
+  if (status.ok) {
+    return;
+  }
+
+  printAndroidToolchainReport(status);
+  throw new Error("Android toolchain check failed. Fix the items above, then run p5kit doctor android again.");
+}
+
+function androidToolchainStatus(projectDir, env) {
+  const java = commandStatus("java", ["-version"], env);
+  const androidSdk = androidSdkStatus(projectDir, env);
+
+  return {
+    ok: java.ok && androidSdk.ok,
+    java,
+    androidSdk,
+  };
+}
+
+function commandStatus(command, args, env) {
+  const result = childProcess.spawnSync(command, args, {
+    encoding: "utf8",
+    env,
+    shell: process.platform === "win32",
+  });
+
+  if (result.error) {
+    return {
+      ok: false,
+      reason: result.error.code === "ENOENT" ? "missing" : result.error.message,
+    };
+  }
+
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      reason: `exited with code ${result.status}`,
+    };
+  }
+
+  return {
+    ok: true,
+  };
+}
+
+function androidSdkStatus(projectDir, env) {
+  const configured = [
+    { source: "ANDROID_HOME", value: env.ANDROID_HOME },
+    { source: "ANDROID_SDK_ROOT", value: env.ANDROID_SDK_ROOT },
+    { source: "android/local.properties", value: androidSdkFromLocalProperties(projectDir) },
+  ].filter((candidate) => candidate.value);
+  const invalidConfigured = [];
+
+  for (const candidate of configured) {
+    const sdkPath = path.resolve(candidate.value);
+
+    if (fs.existsSync(sdkPath)) {
+      return {
+        ok: true,
+        path: sdkPath,
+        source: candidate.source,
+      };
+    }
+
+    invalidConfigured.push({
+      path: sdkPath,
+      reason: `${candidate.source} points to a missing directory`,
+    });
+  }
+
+  if (invalidConfigured.length > 0) {
+    return {
+      ok: false,
+      ...invalidConfigured[0],
+    };
+  }
+
+  for (const sdkPath of defaultAndroidSdkPaths(env)) {
+    if (fs.existsSync(sdkPath)) {
+      return {
+        ok: true,
+        path: sdkPath,
+        source: "default Android Studio SDK path",
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    reason: "missing",
+  };
+}
+
+function androidSdkFromLocalProperties(projectDir) {
+  const localPropertiesPath = path.join(projectDir, "android", "local.properties");
+
+  if (!fs.existsSync(localPropertiesPath)) {
+    return "";
+  }
+
+  const content = fs.readFileSync(localPropertiesPath, "utf8");
+  const sdkDirLine = content
+    .split(/\r?\n/g)
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("sdk.dir="));
+
+  if (!sdkDirLine) {
+    return "";
+  }
+
+  return sdkDirLine.slice("sdk.dir=".length).replace(/\\:/g, ":").replace(/\\\\/g, "\\");
+}
+
+function defaultAndroidSdkPaths(env) {
+  const paths = [];
+
+  if (process.platform === "darwin") {
+    paths.push(path.join(os.homedir(), "Library", "Android", "sdk"));
+  }
+
+  if (process.platform === "win32" && env.LOCALAPPDATA) {
+    paths.push(path.join(env.LOCALAPPDATA, "Android", "Sdk"));
+  }
+
+  paths.push(path.join(os.homedir(), "Android", "Sdk"));
+
+  return paths;
+}
+
+function printAndroidToolchainReport(status) {
+  console.error("p5kit doctor android");
+  console.error("");
+
+  if (status.java.ok) {
+    console.error("Java runtime: found");
+  } else {
+    console.error("Java runtime: missing");
+    console.error("  Install a JDK, then make sure the java command is available on PATH.");
+  }
+
+  if (status.androidSdk.ok) {
+    console.error(`Android SDK: found at ${status.androidSdk.path}`);
+  } else {
+    console.error("Android SDK: missing");
+    if (status.androidSdk.path) {
+      console.error(`  ${status.androidSdk.reason}: ${status.androidSdk.path}`);
+    }
+    console.error("  Install Android Studio, then set ANDROID_HOME or ANDROID_SDK_ROOT to the SDK directory.");
+  }
+
+  console.error("");
+}
+
 function runCapacitor(args) {
   return runLocalBin("cap", args, {
     missingMessage:
@@ -202,11 +376,13 @@ function printHelp() {
 
 Usage:
   p5kit dev [vite options]
+  p5kit doctor [android]
   p5kit run [web|ios|android] [capacitor run options]
   p5kit build [web|ios|android]
 
 Examples:
   p5kit dev --host 0.0.0.0
+  p5kit doctor android
   p5kit build web
   p5kit build ios
   p5kit run android --target Pixel_8

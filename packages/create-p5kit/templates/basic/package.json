@@ -9,7 +9,8 @@
     "run:ios": "p5kit run ios",
     "run:android": "p5kit run android",
     "build:ios": "p5kit build ios",
-    "build:android": "p5kit build android"
+    "build:android": "p5kit build android",
+    "doctor:android": "p5kit doctor android"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
