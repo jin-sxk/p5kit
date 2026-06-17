@@ -138,7 +138,7 @@ function packageSpec(targetDir, packageName, localPath) {
     return `file:${relative.startsWith(".") ? relative : `./${relative}`}`;
   }
 
-  return readPackageVersion(packageName);
+  return readPackageVersion(packageName) || `^${PACKAGE_JSON.version}`;
 }
 
 function readPackageVersion(packageName) {
@@ -147,7 +147,7 @@ function readPackageVersion(packageName) {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
     return `^${packageJson.version}`;
   } catch {
-    return "^0.0.0";
+    return null;
   }
 }
 

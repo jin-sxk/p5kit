@@ -63,6 +63,26 @@ Confirm each tarball only contains the intended package files.
 
 Always bump a package version before publishing. npm does not allow republishing the same version.
 
+Before publishing, compare registry versions with local versions:
+
+```sh
+npm view @p5kit/core version
+npm view @p5kit/cli version
+npm view create-p5kit version
+node -p "require('./packages/core/package.json').version"
+node -p "require('./packages/cli/package.json').version"
+node -p "require('./packages/create-p5kit/package.json').version"
+```
+
+Do not publish a version just because it is already written in a local `package.json`. Decide the intended target version first, then update package files to match that decision.
+
+During the `0.x` phase, use these rules:
+
+- Use a patch bump, for example `0.0.1` to `0.0.2`, for publish fixes, dependency cleanup, package contents fixes, metadata fixes, documentation-only package changes, and internal refactors that do not introduce a new user-facing workflow.
+- Use a minor bump, for example `0.0.1` to `0.1.0`, only for a deliberate user-facing milestone: a new CLI command, generated project behavior, public runtime API, native app workflow, or intentional public package surface change.
+- Keep public package versions aligned when a release requires multiple packages to work together.
+- If the correct bump is ambiguous, stop before publishing and decide the exact target versions explicitly.
+
 Publish dependencies before dependents. Current dependency order:
 
 1. `@p5kit/core`
